@@ -2,23 +2,30 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 
 from home import view_home
-from predict import view_predict
+from predict import view_predict_upload
 from faq import faq_contents
+from articles import view_articles
+from about import view_about
 
 selected = option_menu(
     menu_title="Cryptocurrency Predictor",
-    options=["Home", "Predict", "FAQ", "About"],
-    icons=["house-door", "binoculars", "journal", "info-circle"], # bootstrap icon,
+    options=["Home", "FAQ", "News", "About"],
+    icons=["house-door", "journal", "newspaper", "info-circle"], # bootstrap icon,
     menu_icon="cast",
     default_index=0,
     orientation="horizontal"
 )
 
-if selected == "Home":
-    view_predict()
-if selected == "Predict":
-    view_home()
-if selected == "FAQ":
-    faq_contents()
-if selected == "About":
-    st.title(f"You are in {selected} menu")
+def handleSelectedPage(selected):
+    if selected == "Home":
+        view_home()
+    # if selected == "Predict":
+    #     view_predict_upload()
+    if selected == "FAQ":
+        faq_contents()
+    if selected == "News":
+        view_articles()
+    if selected == "About":
+        view_about()
+
+handleSelectedPage(selected)
