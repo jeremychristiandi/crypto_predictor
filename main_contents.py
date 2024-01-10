@@ -54,7 +54,7 @@ N_PATIENCE_LR = 150
 
 # Save path 
 SPLIT_STR = int(N_SPLIT * 100) 
-BASE_PATH = "saved_model"
+BASE_PATH = "saved"
 BASELINE_PATH = ''
 LSTM_PATH = ''
 NBEATS_PATH = ''
