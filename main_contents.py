@@ -33,12 +33,12 @@ lottie_json = load_lottieurl(lottie_url)
 
 # Global hyperparameter
 TICKER = ''
-N_SPLIT = 0.8
+N_SPLIT = 0.9
 
 # Hyperparameter utama penelitian
 WINDOWS = 0
 HORIZON = 0
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 
 # Hyperparamter model N-BEATS
 N_LAYERS = 4
@@ -59,19 +59,7 @@ BASELINE_PATH = ''
 LSTM_PATH = ''
 NBEATS_PATH = ''
 
-def predict_contents(df, ticker, windows, horizon):
-    TICKER = ticker
-    WINDOWS = windows
-    HORIZON = horizon
-    INPUT_SIZE = WINDOWS
-    THETA_SIZE = INPUT_SIZE + HORIZON
-
-    # Save path 
-    SPLIT_STR = int(N_SPLIT * 100) 
-    BASE_PATH = "saved_model"
-    LSTM_PATH = f"{BASE_PATH}_lstm/lstm_model_{TICKER}_{WINDOWS}_{HORIZON}_{BATCH_SIZE}_{SPLIT_STR}.keras"
-    NBEATS_PATH = f"{BASE_PATH}_nbeats/nbeats_model_{TICKER}_{WINDOWS}_{HORIZON}_{BATCH_SIZE}_{SPLIT_STR}.keras" 
-
+def predict_contents(df, ticker, periods):
     # 1. Menyisakan kolom date dan price
     df_date_price = pd.DataFrame(df["Close"]).rename(columns={"Close": "Price"})
 
@@ -79,56 +67,23 @@ def predict_contents(df, ticker, windows, horizon):
     if df_date_price["Price"].isnull().sum(axis=0) > 0:
         df_date_price.ffill(axis=0)
 
-    plot_preview_prices(df_date_price)
+    visualize_prices(df_date_price, ticker)
 
-    # Memisahkan data date dan price ke array masing-masing
-    timesteps = df_date_price.index.to_numpy()
-    prices = df_date_price["Price"].to_numpy()
-
-    # Memisahkan dataset ke dalam bentuk data train dan test
-    # Persentase splitting ditentukan oleh variabel N_SPLIT
-    split_len = int(len(prices) * N_SPLIT)
-
-    # X train dan test berisi data timesteps
-    # y train dan test berisi data harga crypto
-    X_train, X_test = timesteps[:split_len], timesteps[split_len:]
-    y_train, y_test = prices[:split_len], prices[split_len:]
-
-    all_windows, all_horizons = create_windows_horizons(prices, window=WINDOWS, horizon=HORIZON)
-    windows_train, windows_test, horizons_train, horizons_test = create_dataset_splits(all_windows, all_horizons)
-    
-    # Naive Forecast Dropdown
-    # with st.expander("Naive Model Prediction"):
-    #     naive_res = y_test[:-1]
-    #     visualize_naive(timesteps=X_test,
-    #                    data=naive_res,
-    #                    data_actual=y_test)
-
-    # LSTM Dropdown
+    # create_lstm_prediction(df_date_price, ticker, periods)
     with st.expander("LSTM Model Prediction"):
-        lstm_pred, lstm_res = create_lstm_prediction(ticker, windows, horizon, windows_train, windows_test, horizons_train, horizons_test)
-
-        visualize_pred_actual(timesteps=X_test[-len(windows_test):],
-                    data=lstm_pred, data_actual=np.squeeze(horizons_test))
-
-    with st.expander("NBeats Model Prediction"):
         with st_lottie_spinner(lottie_json, height=100):
-            create_nbeats_model(df_date_price, ticker, windows, horizon)
+            lstm_error = create_lstm_prediction(df_date_price, ticker, periods)
 
-            # nbeats_pred = nbeats_pred.numpy()
-            # visualize_pred_actual(timesteps=X_test[-len(windows_test):],
-            #                         data=nbeats_pred, data_actual=np.squeeze(horizons_test))
-    
-    # with st.expander("Model Error Metrics"):
-    #     visualize_errors(lstm_res, nbeats_res)
+    with st.expander("N-BEATS Model Prediction"):
+        with st_lottie_spinner(lottie_json, height=100):
+            nbeats_error = create_nbeats_model(df_date_price, ticker, periods)
 
-    # with st.expander("Models Error Metrics"):
-    #     with st_lottie_spinner(lottie_json, height=100):
-    #         if lstm_res != None and nbeats_res != None:
-    #             visualize_errors(lstm_res, nbeats_res)
+    with st.expander("Summary"):
+        with st_lottie_spinner(lottie_json, height=100):
+            get_summary(lstm_error, nbeats_error, periods)
       
-def plot_preview_prices(df_prices):
-    with st.expander("Price Visualization"):
+def visualize_prices(df_prices, ticker):
+    with st.expander(f"{ticker} Price Visualization"):
         st.line_chart(df_prices)
 
 def visualize_naive(timesteps, data, data_actual):
@@ -139,12 +94,17 @@ def visualize_naive(timesteps, data, data_actual):
     st.write(fig)
 
 def visualize_pred_actual(timesteps, data, data_actual, start=0, end=None):
-    data_timesteps = timesteps[start:end]
-    pred_prices = data[start:end]
-    actual_prices = data_actual[start:end]
+    if len(timesteps) == 1 or len(data) == 1 or len(data_actual) == 1:
+        data_timesteps = timesteps
+        pred_prices = [data]
+        actual_prices = data_actual
+    else:
+        data_timesteps = timesteps[start:end]
+        pred_prices = data[start:end]
+        actual_prices = data_actual[start:end]
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=data_timesteps, y=pred_prices, name="Prediction",  marker=dict(color='blue')))
+    fig.add_trace(go.Scatter(x=data_timesteps, y=pred_prices, name="Prediction", marker=dict(color='blue'), mode="markers"))
     fig.add_trace(go.Scatter(x=data_timesteps, y=actual_prices, name="Actual", marker=dict(color='orange')))
 
     st.write(fig)
@@ -168,7 +128,7 @@ def create_error_metrics(y_actual, y_pred):
     mape = tf.keras.metrics.mean_absolute_percentage_error(y_actual, y_pred)
 
     # Jika data hasil prediksi lebih dari 1, maka diambil nilai rata-rata nya
-    if len(y_pred) > 0:
+    if tf.size(y_pred) > 0:
         rmse = tf.reduce_mean(rmse)
         mape = tf.reduce_mean(mape)
 
@@ -180,7 +140,7 @@ def create_error_metrics(y_actual, y_pred):
 def save_model_checkpoint(model_name, save_path="model_checkpoints"):
     return tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(save_path, model_name), monitor="val_loss", verbose=0, save_best_only=True)
 
-def create_dataset_splits(windows, horizons, train_size=0.8):
+def create_dataset_splits(windows, horizons, train_size=N_SPLIT):
     split_len = int(len(windows) * train_size)
     windows_train = windows[:split_len]
     horizons_train = horizons[:split_len]
@@ -193,137 +153,187 @@ def create_prediction(model, test_data):
     pred_result = model.predict(test_data)
     return tf.squeeze(pred_result)
 
-def visualize_errors(data_1, data_2):
-    df_1 = pd.DataFrame(data_1, index=["LSTM"])
-    df_2 = pd.DataFrame(data_2, index=["NBEATS"])
-    data = pd.concat([df_1, df_2], axis=0)
-    st.write(data)
+def model_options(ticker):
+    if ticker == 'BTC':
+        return {
+            'windows': 7,
+            'horizon': 1,
+            'batch_size': 128
+        }
+    elif ticker == 'USDC':
+        return {
+            'windows': 7,
+            'horizon': 1,
+            'batch_size': 32
+        }
+    elif ticker == 'XRP':
+        return {
+            'windows': 7,
+            'horizon': 1,
+            'batch_size': 64
+        }
 
-def create_lstm_prediction(ticker, windows, horizon, windows_train, windows_test, horizons_train, horizons_test):
-    LSTM_PATH = f"{BASE_PATH}_lstm/lstm_model_{ticker}_{windows}_{horizon}_{BATCH_SIZE}_{SPLIT_STR}.keras"
+def create_lstm_prediction(df_date_price, ticker, periods):
+    options = model_options(ticker)
+    windows = options['windows']
+    horizon = options['horizon']
+    batch_size = options['batch_size']
+
+    LSTM_PATH = f"{BASE_PATH}_lstm/lstm_model_{ticker}_{windows}_{horizon}_{batch_size}_{SPLIT_STR}.keras"
+
+    # Memisahkan data date dan price ke array masing-masing
+    timesteps = df_date_price.index.to_numpy()[windows:]
+    prices = df_date_price["Price"].to_numpy()[windows:]
+
+    split_len = int(len(prices) * N_SPLIT)
+
+    # X train dan test berisi data timesteps
+    # y train dan test berisi data harga crypto
+    X_train, X_test = timesteps[:split_len], timesteps[split_len:]
+    y_train, y_test = prices[:split_len], prices[split_len:]
+
+    all_windows, all_horizons = create_windows_horizons(prices, window=windows, horizon=horizon)
+    windows_train, windows_test, horizons_train, horizons_test = create_dataset_splits(all_windows, all_horizons)
 
     if os.path.exists(LSTM_PATH):
         lstm_model = load_model(LSTM_PATH)
     else:
-        with st_lottie_spinner(lottie_json, height=100):
-            tf.random.set_seed(42)
+        tf.random.set_seed(42)
 
-            # 1. Membangun Model LSTM 
-            input_layers = layers.Input(shape=windows)
-            x = layers.Lambda(lambda x : tf.expand_dims(x, axis=1))(input_layers)
-            x = layers.LSTM(128, activation="relu")(x)
-            output = layers.Dense(horizon)(x)
-            lstm_model = Model(input_layers, outputs=output, name="lstm_model")
+        # 1. Membangun Model LSTM 
+        input_layers = layers.Input(shape=windows)
+        x = layers.Lambda(lambda x : tf.expand_dims(x, axis=1))(input_layers)
+        x = layers.LSTM(128, activation="relu")(x)
+        output = layers.Dense(horizon)(x)
+        lstm_model = Model(input_layers, outputs=output, name="lstm_model")
 
-            # 2. Compile model LSTM
-            lstm_model.compile(loss="mae",
-                            optimizer=Adam()) 
-            
-            lstm_model.fit(windows_train,
-                        horizons_train,
-                        epochs=N_EPOCHS,
-                        verbose=0,
-                        batch_size=BATCH_SIZE,
-                        validation_data=(windows_test, horizons_test),
-                        callbacks=[save_model_checkpoint(model_name=lstm_model.name),
-                                    EarlyStopping(monitor="val_loss",
-                                                    patience=N_PATIENCE_ES,
-                                                    restore_best_weights=True),
-                                    ReduceLROnPlateau(monitor="val_loss",
-                                                        patience=N_PATIENCE_LR,
-                                                        verbose=1)])
-            
-            lstm_model = load_model("model_checkpoints/lstm_model")
-            lstm_model.save(LSTM_PATH) 
-
-    lstm_pred = create_prediction(lstm_model, windows_test)
-    lstm_res = create_error_metrics(y_actual=tf.squeeze(horizons_test),
-                                    y_pred=lstm_pred) 
-
-    return lstm_pred, lstm_res
-
-@tf.keras.utils.register_keras_serializable(package="CustomLayers")
-class NBeatsBlock(tf.keras.layers.Layer):
-    def __init__(self,
-                input_size: int,
-                theta_size: int,
-                horizon: int,
-                n_neurons: int,
-                n_layers: int,
-                **kwargs):
-        super().__init__(**kwargs)
-        self.input_size = input_size
-        self.theta_size = theta_size
-        self.horizon = horizon
-        self.n_neurons = n_neurons
-        self.n_layers = n_layers
-
-        # Hidden layer -> FC Stack yang terdiri dari 4 layers
-        self.hidden = [tf.keras.layers.Dense(n_neurons, activation="relu") for i in range(n_layers)]
-        # Theta layer -> hasil output dengan linear activation
-        self.theta_layer = tf.keras.layers.Dense(theta_size, activation="linear", name="theta")
-
-    # Fungsi call dijalankan ketika layer dipanggil
-    def call(self, inputs):
-        x = inputs
-        for layer in self.hidden:
-            x = layer(x)
-        theta = self.theta_layer(x)
-        # Hasil output dari theta layer berupa (backcast, forecast)
-        backcast, forecast = theta[:, :self.input_size], theta[:, -self.horizon:]
-        return backcast, forecast
-    
-    def get_config(self):
-        config = {
-            'input_size': self.input_size,
-            'theta_size': self.theta_size,
-            'horizon': self.horizon,
-            'n_neurons': self.n_neurons,
-            'n_layers': self.n_layers,
-        }
-        base_config = super(NBeatsBlock, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
-    
-    @classmethod
-    def from_config(cls, config):
-        return cls(**config)
-
-def create_nbeats_model(df_date_price, ticker, windows, horizon):
-    NBEATS_PATH = f"{BASE_PATH}_nbeats/nbeats_model_{ticker}_{windows}_{horizon}_{BATCH_SIZE}_{SPLIT_STR}.keras"
-    # st.write(NBEATS_PATH)
-    if os.path.exists(NBEATS_PATH):
-        st.write(NBEATS_PATH)
-        nbeats_model = load_model(NBEATS_PATH)
-    else:    
-        date_price_nbeats = df_date_price.copy()
-        for i in range(windows):
-            date_price_nbeats[f"Price+{i+1}"] = date_price_nbeats["Price"].shift(periods=i+1)
+        # 2. Compile model LSTM
+        lstm_model.compile(loss="mae",
+                        optimizer=Adam()) 
         
-        timesteps_nbeats = date_price_nbeats.dropna().index.values
-        X = date_price_nbeats.dropna().drop("Price", axis=1)
-        y = date_price_nbeats.dropna()["Price"]
+        lstm_model.fit(windows_train,
+                    horizons_train,
+                    epochs=N_EPOCHS,
+                    verbose=0,
+                    batch_size=BATCH_SIZE,
+                    validation_data=(windows_test, horizons_test),
+                    callbacks=[save_model_checkpoint(model_name=lstm_model.name),
+                                EarlyStopping(monitor="val_loss",
+                                                patience=N_PATIENCE_ES,
+                                                restore_best_weights=True),
+                                ReduceLROnPlateau(monitor="val_loss",
+                                                    patience=N_PATIENCE_LR,
+                                                    verbose=1)])
+        
+        lstm_model = load_model("model_checkpoints/lstm_model")
+        lstm_model.save(LSTM_PATH) 
+    
+    lstm_pred = create_prediction(lstm_model, windows_test[:periods])
+    
+    if lstm_pred.ndim > 1:
+        lstm_preds = tf.reduce_mean(lstm_pred, axis=1)
+    else:
+        lstm_preds = lstm_pred
+    
+    lstm_res = create_error_metrics(y_actual=tf.squeeze(horizons_test)[:periods], y_pred=lstm_preds)
 
-        split_len = int(len(X) * N_SPLIT)
-        X_train, y_train = X[:split_len], y[:split_len]
-        X_test, y_test = X[split_len:], y[split_len:]
+    visualize_pred_actual(timesteps=X_test[:periods],
+                          data=lstm_preds,
+                          data_actual=horizons_test[:, 0][:periods])
 
-        train_features_dataset = tf.data.Dataset.from_tensor_slices(X_train)
-        train_labels_dataset = tf.data.Dataset.from_tensor_slices(y_train)
+    return lstm_res
 
-        test_features_dataset = tf.data.Dataset.from_tensor_slices(X_test)
-        test_labels_dataset = tf.data.Dataset.from_tensor_slices(y_test)
+block_name = "CustomLayers>NBeatsBlock"
+    
+custom_objects = tf.keras.utils.get_custom_objects()
+if block_name in custom_objects:
+    pass
+else:
+    @tf.keras.utils.register_keras_serializable(package="CustomLayers")
+    class NBeatsBlock(tf.keras.layers.Layer):
+        def __init__(self,
+                    input_size: int,
+                    theta_size: int,
+                    horizon: int,
+                    n_neurons: int,
+                    n_layers: int,
+                    **kwargs):
+            super().__init__(**kwargs)
+            self.input_size = input_size
+            self.theta_size = theta_size
+            self.horizon = horizon
+            self.n_neurons = n_neurons
+            self.n_layers = n_layers
 
-        train_dataset_zipped = tf.data.Dataset.zip((train_features_dataset, train_labels_dataset))
-        test_dataset_zipped = tf.data.Dataset.zip((test_features_dataset, test_labels_dataset))
+            # Hidden layer -> FC Stack yang terdiri dari 4 layers
+            self.hidden = [tf.keras.layers.Dense(n_neurons, activation="relu") for i in range(n_layers)]
+            # Theta layer -> hasil output dengan linear activation
+            self.theta_layer = tf.keras.layers.Dense(theta_size, activation="linear", name="theta")
 
-        BATCH_SIZE_ZIPPED = 1024
+        # Fungsi call dijalankan ketika layer dipanggil
+        def call(self, inputs):
+            x = inputs
+            for layer in self.hidden:
+                x = layer(x)
+            theta = self.theta_layer(x)
+            # Hasil output dari theta layer berupa (backcast, forecast)
+            backcast, forecast = theta[:, :self.input_size], theta[:, -self.horizon:]
+            return backcast, forecast
+        
+        def get_config(self):
+            config = {
+                'input_size': self.input_size,
+                'theta_size': self.theta_size,
+                'horizon': self.horizon,
+                'n_neurons': self.n_neurons,
+                'n_layers': self.n_layers,
+            }
+            base_config = super(NBeatsBlock, self).get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+        
+        @classmethod
+        def from_config(cls, config):
+            return cls(**config)
+            
+def create_nbeats_model(df_date_price, ticker, periods):   
+    options = model_options(ticker)
+    windows = options['windows']
+    horizon = options['horizon']
+    batch_size = options['batch_size']
 
-        train_dataset = train_dataset_zipped.batch(BATCH_SIZE_ZIPPED).prefetch(tf.data.AUTOTUNE)
-        test_dataset = test_dataset_zipped.batch(BATCH_SIZE_ZIPPED).prefetch(tf.data.AUTOTUNE)
+    NBEATS_PATH = f"{BASE_PATH}_nbeats/nbeats_model_{ticker}_{windows}_{horizon}_{batch_size}_{SPLIT_STR}.keras"
 
-        INPUT_SIZE = windows * horizon
-        THETA_SIZE = INPUT_SIZE + horizon
+    date_price_nbeats = df_date_price.copy()
+    for i in range(windows):
+        date_price_nbeats[f"Price+{i+1}"] = date_price_nbeats["Price"].shift(periods=i+1)
+        
+    X = date_price_nbeats.dropna().drop("Price", axis=1)
+    y = date_price_nbeats.dropna()["Price"]
 
+    split_len = int(len(X) * N_SPLIT)
+    X_train, y_train = X[:split_len], y[:split_len]
+    X_test, y_test = X[split_len:], y[split_len:]
+
+    train_features_dataset = tf.data.Dataset.from_tensor_slices(X_train)
+    train_labels_dataset = tf.data.Dataset.from_tensor_slices(y_train)
+
+    test_features_dataset = tf.data.Dataset.from_tensor_slices(X_test)
+    test_labels_dataset = tf.data.Dataset.from_tensor_slices(y_test)
+
+    train_dataset_zipped = tf.data.Dataset.zip((train_features_dataset, train_labels_dataset))
+    test_dataset_zipped = tf.data.Dataset.zip((test_features_dataset, test_labels_dataset))
+
+    BATCH_SIZE_ZIPPED = 1024
+
+    train_dataset = train_dataset_zipped.batch(BATCH_SIZE_ZIPPED).prefetch(tf.data.AUTOTUNE)
+    test_dataset = test_dataset_zipped.batch(BATCH_SIZE_ZIPPED).prefetch(tf.data.AUTOTUNE)
+
+    INPUT_SIZE = windows
+    THETA_SIZE = INPUT_SIZE + horizon
+    
+    if os.path.exists(NBEATS_PATH):
+        nbeats_model = load_model(NBEATS_PATH)
+    else:
         # Pembuatan Model
         tf.random.set_seed(42)
 
@@ -355,27 +365,44 @@ def create_nbeats_model(df_date_price, ticker, windows, horizon):
                                 optimizer=Adam())
         
         nbeats_model.fit(train_dataset,
-                            epochs=2,
-                            validation_data=test_dataset,
-                            verbose=0,
-                            batch_size=BATCH_SIZE,
-                            )
-
-                                #                  callbacks=[save_model_checkpoint(model_name=nbeats_model.name),
-                                # tf.keras.callbacks.EarlyStopping(monitor="val_loss",
-                                #                             patience=150,
-                                #                             restore_best_weights=True),
-                                #     tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss",
-                                #                         patience=150,
-                                #                         verbose=1)]       
+                         epochs=N_EPOCHS,
+                         validation_data=test_dataset,
+                         verbose=0, 
+                         batch_size=BATCH_SIZE,
+                         callbacks=[save_model_checkpoint(model_name=nbeats_model.name),
+                                    tf.keras.callbacks.EarlyStopping(monitor="val_loss",
+                                                            patience=150,
+                                                            restore_best_weights=True),
+                                    tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss",
+                                                        patience=150,
+                                                        verbose=1)])       
         
-        # nbeats_model = load_model("model_checkpoints/nbeats_model")
+        nbeats_model = load_model("model_checkpoints/nbeats_model")
         nbeats_model.save(NBEATS_PATH)
+                
+    nbeats_pred = create_prediction(nbeats_model, X_test[:periods])
 
-    nbeats_pred = create_prediction(nbeats_model, test_dataset)
-    nbeats_res = create_error_metrics(y_actual=y_test,
-                                      y_pred=nbeats_pred)
+    if nbeats_pred.ndim > 1:
+        nbeats_preds = tf.reduce_mean(nbeats_pred, axis=1)
+    else:
+        nbeats_preds = nbeats_pred
+
+    nbeats_res = create_error_metrics(y_actual=y_test[:periods], y_pred=nbeats_preds)
+
+    visualize_pred_actual(timesteps=y_test.index.values[:periods],
+                          data=nbeats_preds,
+                          data_actual=y_test[:periods])
     
-    visualize_pred_actual(timesteps=y_test.index.values, data=nbeats_pred, data_actual=y_test)
+    return nbeats_res
     
-    # return nbeats_pred, nbeats_res
+    
+def get_summary(errors_lstm, errors_nbeats, periods):
+    mape_lstm = errors_lstm["MAPE"]
+    mape_nbeats = errors_nbeats["MAPE"]
+
+    if mape_lstm < mape_nbeats:
+        st.write("Based on the prediction error percentage, the **LSTM** prediction is *more accurate* than the **N-BEATS**.")
+    elif mape_lstm > mape_nbeats:
+        st.write("Based on the prediction error percentage, the **N-BEATS** prediction is *more accurate* than the **LSTM**.")
+    st.write(f"LSTM model yields an error percentage of {'{:10.4f}'.format(mape_lstm)}%")
+    st.write(f"N-BEATS model yields an error percentage of {'{:10.4f}'.format(mape_nbeats)}%")
