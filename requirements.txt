@@ -2,3 +2,7 @@ streamlit-option-menu==0.3.6
 streamlit-lottie==0.0.5
 plotly==5.18.0
 yfinance==0.2.31
+tensorflow==2.10.0
+pandas==1.5.2
+requests==2.31.0
+numpy==1.23.3

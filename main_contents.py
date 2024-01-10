@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import os
-import yfinance as yf
+# import matplotlib.pyplot as plt
+# import yfinance as yf
  
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
