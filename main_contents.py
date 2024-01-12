@@ -70,20 +70,20 @@ def predict_contents(df, ticker, periods):
     visualize_prices(df_date_price, ticker)
 
     # create_lstm_prediction(df_date_price, ticker, periods)
-    with st.expander("LSTM Model Prediction"):
+    with st.expander("LSTM Model Prediction", expanded=True):
         with st_lottie_spinner(lottie_json, height=100):
             lstm_error = create_lstm_prediction(df_date_price, ticker, periods)
 
-    with st.expander("N-BEATS Model Prediction"):
+    with st.expander("N-BEATS Model Prediction", expanded=True):
         with st_lottie_spinner(lottie_json, height=100):
             nbeats_error = create_nbeats_model(df_date_price, ticker, periods)
 
-    with st.expander("Summary"):
+    with st.expander("Summary", expanded=True):
         with st_lottie_spinner(lottie_json, height=100):
             get_summary(lstm_error, nbeats_error, periods)
-      
+
 def visualize_prices(df_prices, ticker):
-    with st.expander(f"{ticker} Price Visualization"):
+    with st.expander(f"{ticker} Price Visualization", expanded=True):
         st.line_chart(df_prices)
 
 def visualize_naive(timesteps, data, data_actual):

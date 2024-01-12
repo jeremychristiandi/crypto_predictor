@@ -18,7 +18,9 @@ def view_home():
     date = pd.to_datetime(date)
 
     selected_periods = st.slider("Period (days)", 1, 180, 7)
-    st.write(f"Prediction date: {date[0].strftime('%d/%m/%Y')} to {date[selected_periods-1].strftime('%d/%m/%Y')}")
+
+    st.write(f"Selected ticker: :red[{selected_ticker}]")
+    st.write(f"Selected period(s): :red[{date[0].strftime('%d/%m/%Y')} to {date[selected_periods-1].strftime('%d/%m/%Y')}]")
 
     if st.button("Generate Prediction"):
         if selected_ticker != "" and selected_periods != "":
