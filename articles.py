@@ -5,6 +5,15 @@ API_KEY = "pub_35053be17cf98ac299aa66f8f9f7270e4f16d"
 URL = f"https://newsdata.io/api/1/news?apikey={API_KEY}&q=crypto"
 
 def view_articles():
+    st.markdown("""
+    <style>
+    div.stSpinner > div {
+        text-align:center;
+        align-items: center;
+        justify-content: center;
+    }
+    </style>""", unsafe_allow_html=True)
+      
     with st.spinner("Loading latest news..."):
         response = requests.get(URL, verify=False)
     status = response.status_code

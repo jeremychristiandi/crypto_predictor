@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
+import time
 # import matplotlib.pyplot as plt
 # import yfinance as yf
  
@@ -45,8 +46,8 @@ N_LAYERS = 4
 N_STACKS = 30
 N_NEURONS = 512
 N_EPOCHS = 5000
-INPUT_SIZE = None
-THETA_SIZE = None
+# INPUT_SIZE = None
+# THETA_SIZE = None
 
 # Lainnya
 N_PATIENCE_ES = 150
@@ -67,20 +68,40 @@ def predict_contents(df, ticker, periods):
     if df_date_price["Price"].isnull().sum(axis=0) > 0:
         df_date_price.ffill(axis=0)
 
+    # visualize_prices(df_date_price, ticker)
+
+    # with st.expander("LSTM Model Prediction", expanded=True):
+    #     with st_lottie_spinner(lottie_json, height=100):
+    #         lstm_error = create_lstm_prediction(df_date_price, ticker, periods)
+
+    # with st.expander("N-BEATS Model Prediction", expanded=True):
+    #     with st_lottie_spinner(lottie_json, height=100):
+    #         nbeats_error = create_nbeats_model(df_date_price, ticker, periods)
+
+    # with st.expander("Summary", expanded=True):
+    #     with st_lottie_spinner(lottie_json, height=100):
+    #         get_summary(lstm_error, nbeats_error, periods)
+        
+    with st.spinner("Waiting for prediction..."):
+        lstm_error, lstm_timesteps, lstm_data, lstm_data_actual = create_lstm_prediction(df_date_price, ticker, periods)
+        nbeats_error, nbeats_timesteps, nbeats_data, nbeats_data_actual = create_nbeats_model(df_date_price, ticker, periods)
+
+    alert = st.success("Successfully generating prediction!")
+
     visualize_prices(df_date_price, ticker)
+    visualize_pred_actual(timesteps=lstm_timesteps,
+                            data=lstm_data,
+                            data_actual=lstm_data_actual,
+                            model_name="LSTM")
+    visualize_pred_actual(timesteps=nbeats_timesteps,
+                                data=nbeats_data,
+                                data_actual=nbeats_data_actual,
+                                model_name="N-BEATS")
+    get_summary(lstm_error, nbeats_error, periods)
 
-    # create_lstm_prediction(df_date_price, ticker, periods)
-    with st.expander("LSTM Model Prediction", expanded=True):
-        with st_lottie_spinner(lottie_json, height=100):
-            lstm_error = create_lstm_prediction(df_date_price, ticker, periods)
+    time.sleep(2)
+    alert.empty()
 
-    with st.expander("N-BEATS Model Prediction", expanded=True):
-        with st_lottie_spinner(lottie_json, height=100):
-            nbeats_error = create_nbeats_model(df_date_price, ticker, periods)
-
-    with st.expander("Summary", expanded=True):
-        with st_lottie_spinner(lottie_json, height=100):
-            get_summary(lstm_error, nbeats_error, periods)
 
 def visualize_prices(df_prices, ticker):
     with st.expander(f"{ticker} Price Visualization", expanded=True):
@@ -93,7 +114,7 @@ def visualize_naive(timesteps, data, data_actual):
 
     st.write(fig)
 
-def visualize_pred_actual(timesteps, data, data_actual, start=0, end=None):
+def visualize_pred_actual(timesteps, data, data_actual, start=0, end=None, model_name="LSTM"):
     if len(timesteps) == 1 or len(data) == 1 or len(data_actual) == 1:
         data_timesteps = timesteps
         pred_prices = [data]
@@ -107,7 +128,8 @@ def visualize_pred_actual(timesteps, data, data_actual, start=0, end=None):
     fig.add_trace(go.Scatter(x=data_timesteps, y=pred_prices, name="Prediction", marker=dict(color='blue'), mode="markers"))
     fig.add_trace(go.Scatter(x=data_timesteps, y=actual_prices, name="Actual", marker=dict(color='orange')))
 
-    st.write(fig)
+    with st.expander(f"{model_name} Model Prediction", expanded=True):
+        st.write(fig)
 
 def create_windows_horizons(data, window=WINDOWS, horizon=HORIZON):
     window_step = np.expand_dims(np.arange(window + horizon), axis=0)
@@ -237,11 +259,17 @@ def create_lstm_prediction(df_date_price, ticker, periods):
     
     lstm_res = create_error_metrics(y_actual=tf.squeeze(horizons_test)[:periods], y_pred=lstm_preds)
 
-    visualize_pred_actual(timesteps=X_test[:periods],
-                          data=lstm_preds,
-                          data_actual=horizons_test[:, 0][:periods])
+    # visualize_pred_actual(timesteps=X_test[:periods],
+    #                       data=lstm_preds,
+    #                       data_actual=horizons_test[:, 0][:periods])
 
-    return lstm_res
+    # return lstm_res
+
+    timesteps=X_test[:periods]
+    data=lstm_preds
+    data_actual=horizons_test[:, 0][:periods]
+
+    return lstm_res, timesteps, data, data_actual
 
 block_name = "CustomLayers>NBeatsBlock"
     
@@ -338,11 +366,11 @@ def create_nbeats_model(df_date_price, ticker, periods):
         tf.random.set_seed(42)
 
         block_layer = NBeatsBlock(input_size=INPUT_SIZE,
-                                    theta_size=THETA_SIZE,
-                                    horizon=horizon,
-                                    n_neurons=N_NEURONS,
-                                    n_layers=N_LAYERS,
-                                    name="basic_block")
+                                  theta_size=THETA_SIZE,
+                                  horizon=horizon,
+                                  n_neurons=N_NEURONS,
+                                  n_layers=N_LAYERS,
+                                  name="basic_block")
         
         stack_input = layers.Input(shape=(INPUT_SIZE), name="stack_input")
 
@@ -389,20 +417,27 @@ def create_nbeats_model(df_date_price, ticker, periods):
 
     nbeats_res = create_error_metrics(y_actual=y_test[:periods], y_pred=nbeats_preds)
 
-    visualize_pred_actual(timesteps=y_test.index.values[:periods],
-                          data=nbeats_preds,
-                          data_actual=y_test[:periods])
+    # visualize_pred_actual(timesteps=y_test.index.values[:periods],
+    #                       data=nbeats_preds,
+    #                       data_actual=y_test[:periods])
     
-    return nbeats_res
+    # return nbeats_res
+
+    timesteps=y_test.index.values[:periods]
+    data=nbeats_preds
+    data_actual=y_test[:periods]
+    
+    return nbeats_res, timesteps, data, data_actual
     
     
 def get_summary(errors_lstm, errors_nbeats, periods):
     mape_lstm = errors_lstm["MAPE"]
     mape_nbeats = errors_nbeats["MAPE"]
 
-    if mape_lstm < mape_nbeats:
-        st.write("Based on the prediction error percentage, the **LSTM** prediction is *more accurate* than the **N-BEATS**.")
-    elif mape_lstm > mape_nbeats:
-        st.write("Based on the prediction error percentage, the **N-BEATS** prediction is *more accurate* than the **LSTM**.")
-    st.write(f"LSTM model yields an error percentage of {'{:10.4f}'.format(mape_lstm)}%")
-    st.write(f"N-BEATS model yields an error percentage of {'{:10.4f}'.format(mape_nbeats)}%")
+    with st.expander("Summary", expanded=True):
+        if mape_lstm < mape_nbeats:
+            st.write("Based on the prediction error percentage, the **LSTM** prediction is *more accurate* than the **N-BEATS**.")
+        elif mape_lstm > mape_nbeats:
+            st.write("Based on the prediction error percentage, the **N-BEATS** prediction is *more accurate* than the **LSTM**.")
+        st.write(f"LSTM model yields an error percentage of {'{:10.4f}'.format(mape_lstm)}%")
+        st.write(f"N-BEATS model yields an error percentage of {'{:10.4f}'.format(mape_nbeats)}%")
