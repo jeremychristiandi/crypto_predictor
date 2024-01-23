@@ -92,12 +92,14 @@ def predict_contents(df, ticker, periods):
     visualize_pred_actual(timesteps=lstm_timesteps,
                             data=lstm_data,
                             data_actual=lstm_data_actual,
-                            model_name="LSTM")
+                            model_name="LSTM",
+                            errors=lstm_error)
     visualize_pred_actual(timesteps=nbeats_timesteps,
                                 data=nbeats_data,
                                 data_actual=nbeats_data_actual,
-                                model_name="N-BEATS")
-    get_summary(lstm_error, nbeats_error, periods)
+                                model_name="N-BEATS",
+                                errors=nbeats_error)
+    get_summary(lstm_error, nbeats_error)
 
     time.sleep(2)
     alert.empty()
@@ -114,7 +116,7 @@ def visualize_naive(timesteps, data, data_actual):
 
     st.write(fig)
 
-def visualize_pred_actual(timesteps, data, data_actual, start=0, end=None, model_name="LSTM"):
+def visualize_pred_actual(timesteps, data, data_actual, start=0, end=None, model_name="LSTM", errors=None):
     if len(timesteps) == 1 or len(data) == 1 or len(data_actual) == 1:
         data_timesteps = timesteps
         pred_prices = [data]
@@ -129,7 +131,9 @@ def visualize_pred_actual(timesteps, data, data_actual, start=0, end=None, model
     fig.add_trace(go.Scatter(x=data_timesteps, y=actual_prices, name="Actual", marker=dict(color='orange')))
 
     with st.expander(f"{model_name} Model Prediction", expanded=True):
+        errors = errors["MAPE"]
         st.write(fig)
+        st.markdown(f"Model average error rate: {'{:10.4f}'.format(errors)}%", help="The deviation of the **prediction** price compared to the **actual** price")
 
 def create_windows_horizons(data, window=WINDOWS, horizon=HORIZON):
     window_step = np.expand_dims(np.arange(window + horizon), axis=0)
@@ -430,14 +434,14 @@ def create_nbeats_model(df_date_price, ticker, periods):
     return nbeats_res, timesteps, data, data_actual
     
     
-def get_summary(errors_lstm, errors_nbeats, periods):
+def get_summary(errors_lstm, errors_nbeats):
     mape_lstm = errors_lstm["MAPE"]
     mape_nbeats = errors_nbeats["MAPE"]
 
     with st.expander("Summary", expanded=True):
         if mape_lstm < mape_nbeats:
-            st.write("Based on the prediction error percentage, the **LSTM** prediction is *more accurate* than the **N-BEATS**.")
+            st.write("Based on the prediction error rate, the **LSTM** model prediction is *more accurate* than the **N-BEATS**.")
         elif mape_lstm > mape_nbeats:
-            st.write("Based on the prediction error percentage, the **N-BEATS** prediction is *more accurate* than the **LSTM**.")
-        st.write(f"LSTM model yields an error percentage of {'{:10.4f}'.format(mape_lstm)}%")
-        st.write(f"N-BEATS model yields an error percentage of {'{:10.4f}'.format(mape_nbeats)}%")
+            st.write("Based on the prediction error rate, the **N-BEATS** model prediction is *more accurate* than the **LSTM**.")
+        st.write(f"LSTM model yields an average error rate of {'{:10.4f}'.format(mape_lstm)}%")
+        st.write(f"N-BEATS model yields an average error rate of {'{:10.4f}'.format(mape_nbeats)}%")

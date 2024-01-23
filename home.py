@@ -7,8 +7,9 @@ from main_contents import predict_contents
 
 def view_home():
     st.title("Predict Cryptocurrency Price")
-    st.caption("Predict cryptocurrency price using a pre-trained model.")
-    selected_ticker = st.selectbox('Select Ticker', ('BTC', 'USDC', 'XRP'))
+    st.caption("Predict cryptocurrency price using a pre-trained deep learning model.")
+    st.caption("*For research purposes only, not a financial advice.*")
+    selected_ticker = st.selectbox('Select Ticker', ('BTC', 'USDC', 'XRP'), help="A ticker is a symbol/code representing a token or cryptocurrency.")
     # selected_windows = st.slider('Total days of observation', 1, 180, 7)
     # selected_horizon = st.slider('Total days of prediction', 1, 30, 1)
 
@@ -17,9 +18,14 @@ def view_home():
     date = df.index.values[split_size:][1:]
     date = pd.to_datetime(date)
 
-    selected_periods = st.slider("Period (days)", 1, 180, 7)
+    selected_periods = st.slider("Period (days)", 1, 180, 7, help="Total number of days of prediction")
 
-    st.write(f"Selected ticker: :red[{selected_ticker}]")
+    if selected_ticker == 'BTC':
+        st.write(f"Selected ticker: :red[{selected_ticker} (Bitcoin)]")
+    elif selected_ticker == 'USDC':
+        st.write(f"Selected ticker: :red[{selected_ticker} (USD Coin)]")
+    elif selected_ticker == 'XRP':
+        st.write(f"Selected ticker: :red[{selected_ticker} (Ripple)]")
     st.write(f"Selected period(s): :red[{date[0].strftime('%d/%m/%Y')} to {date[selected_periods-1].strftime('%d/%m/%Y')}]")
 
     if st.button("Generate Prediction"):
