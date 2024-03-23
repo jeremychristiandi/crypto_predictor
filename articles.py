@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 API_KEY = "pub_35053be17cf98ac299aa66f8f9f7270e4f16d"
-URL = f"https://newsdata.io/api/1/news?apikey={API_KEY}&q=crypto"
+URL = f"https://newsdata.io/api/1/news?apikey={API_KEY}&q=crypto,finance,cryptocurrency,bitcoin&language=en"
 
 def view_articles():
     st.markdown("""
