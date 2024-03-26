@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
 import time
+from datetime import timedelta, datetime
 
 from main_contents import predict_contents
 
@@ -26,7 +26,14 @@ def view_home():
         st.write(f"Selected ticker: :red[{selected_ticker} (USD Coin)]")
     elif selected_ticker == 'XRP':
         st.write(f"Selected ticker: :red[{selected_ticker} (Ripple)]")
-    st.write(f"Selected period(s): :red[{date[0].strftime('%d/%m/%Y')} to {date[selected_periods-1].strftime('%d/%m/%Y')}]")
+
+    first_date = date[0].strftime('%d/%m/%Y') 
+    first_date_str = datetime.strptime(first_date, '%d/%m/%Y')
+    last_date = first_date_str + timedelta(days=selected_periods-1) 
+    last_date = last_date.strftime('%d/%m/%Y') 
+
+    # st.write(f"Selected period(s): :red[{date[0].strftime('%d/%m/%Y')} to {date[selected_periods-1].strftime('%d/%m/%Y')}]")
+    st.write(f"Selected period(s): :red[{first_date} to {last_date}]")
 
     if st.button("Generate Prediction"):
         if selected_ticker != "" and selected_periods != "":

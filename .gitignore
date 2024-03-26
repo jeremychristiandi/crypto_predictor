@@ -4,3 +4,5 @@ saved_model_nbeats/
 model_checkpoints/
 __pycache__/
 *.pyc
+.pyc
+env

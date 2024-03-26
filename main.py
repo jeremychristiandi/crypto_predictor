@@ -9,7 +9,7 @@ from about import view_about
 
 selected = option_menu(
     menu_title="Cryptocurrency Predictor",
-    options=["Home", "FAQ", "News", "About"],
+    options=["Home", "Predict", "FAQ", "News", "About"],
     icons=["house-door", "journal", "newspaper", "info-circle"], # bootstrap icon,
     menu_icon="cast",
     default_index=0,
@@ -19,8 +19,8 @@ selected = option_menu(
 def handleSelectedPage(selected):
     if selected == "Home":
         view_home()
-    # if selected == "Predict":
-    #     view_predict_upload()
+    if selected == "Predict":
+        view_predict_upload()
     if selected == "FAQ":
         faq_contents()
     if selected == "News":
