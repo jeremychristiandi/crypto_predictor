@@ -10,7 +10,7 @@ from about import view_about
 selected = option_menu(
     menu_title="Cryptocurrency Predictor",
     options=["Home", "Predict", "FAQ", "News", "About"],
-    icons=["house-door", "journal", "newspaper", "info-circle"], # bootstrap icon,
+    icons=["house-door", "bar-chart", "journal", "newspaper", "info-circle"], # bootstrap icon,
     menu_icon="cast",
     default_index=0,
     orientation="horizontal"
