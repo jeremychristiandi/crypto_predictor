@@ -8,6 +8,7 @@ from main_contents import predict_contents
 def view_predict_upload():
     st.title(f"Predict Your Own Cryptocurrency Data.")
     uploaded_file = st.file_uploader("Upload your time series .CSV file")
+    df = ""
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
 
@@ -17,8 +18,10 @@ def view_predict_upload():
         if selected_ticker not in os.path.basename(uploaded_file.name):
             st.write(":red[Are you sure the selected ticker is correct?]")
 
-    total_periods = math.floor(len(df) * 0.1) - 1
-    # total_periods = 30
+    if df is not None and df is not "":
+        total_periods = math.floor(len(df) * 0.1) - 1
+    else:
+        total_periods = 30
     selected_periods = st.slider("Period (days)", 1, total_periods, 7, help="Total number of days of prediction")
 
     if selected_ticker == 'BTC':
